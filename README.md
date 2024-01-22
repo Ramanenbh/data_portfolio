@@ -80,6 +80,7 @@ A Foreigner is identified as people whose country in mail address is not the sam
 Display the percentage as ForeignerPercent. Round the percentage up to 2 decimal places, e.g. 50.99%.
 
 ````sql
+# create a Common Table Expression (CTE) for easy usage
 WITH num as
 (SELECT COUNT(c.customerID) AS ftot
 FROM customer c
@@ -173,3 +174,49 @@ ON c.customerID = p.CustomerID
 GROUP BY c.CustomerID
 ORDER BY c.Country;
 ````
+Q8) How much does airport tax account for each airline's profits, order by this amount
+first for each flight find the total amount earned & total airport tax paid then use this information to calculate the airport tax
+Give the profit ranking and provide the ranking values for this in the same table as well
+
+````sql
+# need to alter this table to include the airportTax
+ALTER VIEW airport_city_country AS (
+SELECT a.airportCode, c.CityCode, c.CityName, country.CountryCode, country.CountryName, a.airportTax
+FROM airport a
+JOIN city c ON a.CityCode = c.CityCode
+JOIN country ON c.CountryCode = country.CountryCode
+);
+
+# get all the required fields in a single table
+WITH tempview AS (
+SELECT b.BookingID, b.FlightNumber,  
+
+(SELECT AirlineName 
+FROM airline 
+WHERE AirlineCode = (SELECT AirlineCode FROM flight WHERE flight.FlightNumber = f.FlightNumber)) as airline_name,
+
+(SELECT airportTax as ori_tax FROM airport_City_country WHERE airportcode = f.OriginAirportCode) as ori_tax,
+(SELECT airportTax as dest_tax FROM airport_City_country WHERE airportcode = f.DestinationAirportCode) as dest_tax,
+b.TotalPrice
+FROM booking b 
+LEFT JOIN flightavailability f ON b.FlightNumber = f.FlightNumber
+)
+
+# this extra query is due to make created columns look nicer instead of messily doing it above
+SELECT t.airline_name,SUM((t.ori_tax + t.dest_tax) / (t.TotalPrice)) as percentage, 
+SUM(t.totalPrice - t.ori_tax - t.dest_tax) as profit,
+RANK() OVER(ORDER BY SUM(t.totalPrice - t.ori_tax - t.dest_tax) DESC) AS profit_ranking
+FROM tempview t
+GROUP BY airline_name
+ORDER BY percentage DESC;
+````
+
+* Results (airline_name, percentage, profit, profit_ranking)
+* Gro	42.12509111013744	1320767.9609375	1
+* GauAir	39.124484659454716	618098.5869216919	4
+* CarAir	35.94569103702192	819599.5782165527	3
+* IpoAir	23.454337102429104	1066484.2144470215	2
+* TulAir	13.139882533086572	395186.9242553711	5
+* RoseAir	9.94487556692947	281584.36334228516	6
+
+### This tells me that almost 42% of flight revenue goes into airport tax hence while it may seem that Gro is losing a lot of money, it is infact making a lot more in profit. While GauAir is paying 39% of its profits to airport tax but is only 4th in profitability, this suggests that they should instead reconsider if their route is worth continuting or not
