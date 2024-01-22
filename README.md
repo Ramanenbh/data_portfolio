@@ -157,3 +157,19 @@ sub2.DestinationAirportCode = sub.OriginAirportCode;
 * AP03	CopAirport	3
 
 ## Can give galAirport a prize for being the best airport handling the most number of flights in weekdays
+
+Q7) Which are the top countries with the highest average paying customers, 
+as well as ranking them in their respective countries
+We shall consider the full amount (paid amount + balance) here
+
+````mysql
+SELECT c.customerID, 
+c.Country,
+SUM(p.balance + p.PaidAmount) AS total,
+row_number() OVER(PARTITION BY c.Country ORDER BY ROUND(SUM(p.balance + p.PaidAmount),2)) as in_country_ranking
+FROM customer c
+INNER JOIN payment p
+ON c.customerID = p.CustomerID
+GROUP BY c.CustomerID
+ORDER BY c.Country;
+````
